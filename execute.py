@@ -1,13 +1,16 @@
 import subprocess
 import shlex
+import platform
 
 def execute(cmd):
     cmd = cmd.strip()
     if not cmd:
         return ''
     try:
-        output = subprocess.check_output(shlex.split(cmd),
-                                         stderr=subprocess.STDOUT)
+        if platform.system().lower() == 'windows':
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        else:
+            output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT)
         return output.decode()
     except subprocess.CalledProcessError as e:
         return e.output.decode()

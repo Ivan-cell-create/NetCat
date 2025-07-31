@@ -31,7 +31,9 @@ class NetCat:
                     if not data:
                         break
                     recv_len = len(data)
-                    response += data.decode()
+                    chunk = data.decode()
+                    response += chunk
+                    print(chunk, end='') 
                     if recv_len < 4096:
                         break
 
