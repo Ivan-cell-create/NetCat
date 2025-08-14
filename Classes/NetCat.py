@@ -1,5 +1,6 @@
 import threading
 import socket
+import time
 from execute import *
 
 """
@@ -49,17 +50,12 @@ class NetCat:
                     if recv_len < 4096:
                         break
 
-                if response:
-                    print(response, end='')
-
-                try:
-                    buffer = input('> ') + '\n'
-                except (EOFError, KeyboardInterrupt):
-                    print("\n[!] Выход")
-                    break
-
-                self.socket.send(buffer.encode())
-
+                #if response:
+                #   print(response, end='')
+                
+                buffer = input('') 
+                self.socket.send((buffer + '\n').encode())
+                
         except Exception as e:
             print(f"[!] Ошибка при подключении/отправке: {e}")
         finally:
@@ -69,7 +65,8 @@ class NetCat:
     Реализация многопоточного TCP-сервера
     """
     def listen(self):
-        self.socket.bind((self.args.target, self.args.port))
+        bind_ip = self.args.target if self.args.target else '0.0.0.0' #Если не получилось, то подключение с любого IP
+        self.socket.bind((bind_ip, self.args.port))
         self.socket.listen(5) #Максимальная длина очереди ожидания соединения 
         while True:
             client_socket, _ = self.socket.accept()
@@ -82,35 +79,51 @@ class NetCat:
      Обработка подлючения в зависимости от аргумента 
     """
     def handle(self, client_socket):
-        if self.args.execute: #Команда в системе с возвратом результата 
+        if self.args.execute:
+            start_time = time.time() 
             output = execute(self.args.execute)
             client_socket.send(output.encode())
+            elapsed_time = time.time() - start_time
+            print(f"[*] Выполнение команды завершено за {elapsed_time:.2f} секунд")
 
-        elif self.args.upload: #Прием и сохранение файла 
-            file_buffer = b'' 
+        elif self.args.upload:
+            start_time = time.time()  
+            file_buffer = b''
             while True:
                 data = client_socket.recv(4096)
-                if data:
-                    file_buffer += data
-                else:
+                if not data:
                     break
+                file_buffer += data
             with open(self.args.upload, 'wb') as f:
                 f.write(file_buffer)
             message = f'[+] Файл сохранён: {self.args.upload}'
             client_socket.send(message.encode())
+            elapsed_time = time.time() - start_time
+            print(f"[*] Загрузка файла завершена за {elapsed_time:.2f} секунд")
 
-        elif self.args.command: #Интерактивная командная оболочка
+        elif self.args.command:
+            start_time = time.time()
             cmd_buffer = b''
+            client_socket.settimeout(5.0) 
             while True:
                 try:
                     client_socket.send(b'BHP: #> ')
                     while b'\n' not in cmd_buffer:
-                        cmd_buffer += client_socket.recv(4096)
+                        chunk = client_socket.recv(4096)
+                        if not chunk:
+                            return  
+                        cmd_buffer += chunk
                     response = execute(cmd_buffer.decode())
                     if response:
                         client_socket.send(response.encode())
                     cmd_buffer = b''
+                except socket.timeout:
+                    print("[!] Тайм-аут при получении данных")
+                    client_socket.close()
+                    return
                 except Exception as e:
                     print(f'[!] Сервер завершил работу: {e}')
                     client_socket.close()
                     break
+            elapsed_time = time.time() - start_time
+            print(f"[*] Сессия командной оболочки завершена за {elapsed_time:.2f} секунд")
