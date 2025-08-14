@@ -2,6 +2,11 @@ import subprocess
 import shlex
 import platform
 
+
+"""
+Метод execute, который определяет ОС юзера 
+cmd - строка с командой системы 
+"""
 def execute(cmd):
     cmd = cmd.strip()
     if not cmd:
